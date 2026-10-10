@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flocus - Pomodoro Focus & Lofi Studio</title>
+  <meta name="description" content="Aplikasi Pomodoro Studio interaktif, estetik bergaya Flocus dengan ambient sound, integrasi Spotify, bilingual ID/EN, dan wallpaper kustom.">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            flocus: {
+              accent: '#7c3aed'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="relative min-h-screen text-slate-100 selection:bg-purple-500/30 selection:text-purple-200">
+
+  <!-- Layer 0: Wallpaper Latar Belakang (Tetap Menggunakan 5 Wallpaper dari Pengguna) -->
+  <div id="app-background-image" aria-hidden="true"></div>
+
+  <!-- Layer 1: Overlay Kontras & Kegelapan -->
+  <div id="app-background-overlay" aria-hidden="true"></div>
+
+  <!-- ========================================================
+       TOP HEADER (KIRI: FLOCUS LOGO | KANAN: QUOTES TANDA PETIK)
+       ======================================================== -->
+  <header class="flocus-header fixed top-0 left-0 right-0 z-40 flex items-start justify-between p-6 sm:p-8 md:p-10 pointer-events-none select-none">
+    
+    <!-- 1. KIRI ATAS: Brand -->
+    <div class="brand-lockup pointer-events-auto" onclick="switchSlide('home')" title="Beranda ha-ri">
+      <span class="flocus-logo">ha-ri</span>
+      <span class="brand-tagline">pomodoro time</span>
+    </div>
+
+    <!-- 2. KANAN ATAS: Quotes Tepat Sesuai Gambar (2 Baris Rapi dengan Tanda Petik) -->
+    <div 
+      id="top-quote-container" 
+      class="pointer-events-auto cursor-pointer"
+      onclick="nextQuote()" 
+      title="Klik untuk memutar kutipan / Click to shuffle"
+    >
+      <div id="quote-text" class="flocus-quote-text">
+        “Stop saying I wish, start saying I will”
+      </div>
+    </div>
+
+  </header>
+
+  <!-- ========================================================
+       AREA UTAMA: PERSIS TATA LETAK & UKURAN GAMBAR CONTOH
+       ======================================================== -->
+  <div id="app-container">
+
+    <!-- ========================================================
+         SLIDE 1: FOCUS SLIDE (TATA LETAK PERSIS GAMBAR CONTOH)
+         ======================================================== -->
+    <section id="slide-focus" class="slide-view active flex flex-col items-center justify-center w-full max-w-xl mx-auto text-center select-none">
+      
+      <!-- 1. TASK FOCUS NAME (Contoh di Gambar: "makan") -->
+      <div class="flocus-task-container mb-3 flex items-center justify-center gap-2 group">
+        <button 
+          id="btn-complete-pinned-task"
+          onclick="onPinnedTaskCheckboxChecked()" 
+          class="flocus-task-check-btn w-6 h-6 rounded-full border border-white/40 hover:border-white hover:bg-white/20 flex items-center justify-center text-xs text-white"
+          title="Tandai selesai & beralih ke tugas berikutnya"
+        >
+          ✓
+        </button>
+
+        <span 
+          id="pinned-task-name" 
+          onclick="toggleTaskModal()" 
+          class="flocus-task-name"
+          title="Klik untuk melihat/mengedit tugas"
+        >
+          makan
+        </span>
+
+        <button 
+          onclick="toggleTaskModal()" 
+          class="flocus-task-check-btn w-6 h-6 rounded-full hover:bg-white/10 flex items-center justify-center text-xs text-white/60 hover:text-white"
+          title="Buka daftar checklist tugas"
+        >
+          ✎
+        </button>
+      </div>
+
+      <!-- 2. MODE SELECTOR (FOCUS   SHORT BREAK   LONG BREAK) -->
+      <div class="flex items-center justify-center gap-5 sm:gap-7 mb-1.5">
+        <button 
+          id="tab-focus" 
+          onclick="setTimerMode('focus')" 
+          class="flocus-mode-btn active"
+          data-i18n="focus"
+        >
+          FOCUS
+        </button>
+        <button 
+          id="tab-short-break" 
+          onclick="setTimerMode('shortBreak')" 
+          class="flocus-mode-btn"
+          data-i18n="shortBreak"
+        >
+          SHORT BREAK
+        </button>
+        <button 
+          id="tab-long-break" 
+          onclick="setTimerMode('longBreak')" 
+          class="flocus-mode-btn"
+          data-i18n="longBreak"
+        >
+          LONG BREAK
+        </button>
+      </div>
+
+      <!-- 3. PROGRESS CYCLE DOTS (● ● ● ○) -->
+      <div id="cycle-dots-container" class="flex items-center justify-center gap-1.5 mb-2">
+        <span class="cycle-dot active"></span>
+        <span class="cycle-dot inactive"></span>
+        <span class="cycle-dot inactive"></span>
+        <span class="cycle-dot inactive"></span>
+      </div>
+
+      <!-- 4. HUGE TIMER DIGITS (Contoh di Gambar: "10:00") -->
+      <div 
+        id="timer-digits" 
+        class="flocus-timer-digits my-1"
+        onclick="toggleTimer()"
+        title="Klik untuk Mulai / Jeda (Spasi)"
+      >
+        25:00
+      </div>
+
+      <!-- 5. KONTROL TIMER: [ ▷ ] [ ▷| ] [ ↻ ] -->
+      <div class="timer-controls-main flex items-center justify-center gap-2 sm:gap-3 mt-4">
+        
+        <!-- Play / Pause Icon Button -->
+        <button 
+          id="btn-play-pause"
+          onclick="toggleTimer()" 
+          class="flocus-action-btn"
+          title="Mulai / Jeda (Spasi)"
+          aria-label="Mulai timer"
+        >
+          <svg id="play-pause-icon" class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+            <polygon points="6 4 20 12 6 20 6 4"/>
+          </svg>
+        </button>
+
+        <!-- Skip Icon Button (▷|) -->
+        <button 
+          id="btn-timer-skip"
+          onclick="skipTimer()" 
+          class="flocus-action-btn"
+          title="Lewati Sesi (⏭)"
+        >
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+            <polygon points="5 4 15 12 5 20 5 4"/>
+            <rect x="17" y="4" width="2.5" height="16" rx="0.5"/>
+          </svg>
+        </button>
+
+        <!-- Reset / Restart Icon Button (↻) -->
+        <button 
+          id="btn-timer-reset"
+          onclick="requestTimerReset()" 
+          class="flocus-action-btn"
+          title="Reset Sesi (↺)"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+        </button>
+
+      </div>
+
+    </section>
+
+    <!-- ========================================================
+         SLIDE 2: HOME SLIDE (JAM BESAR, GREETING, STREAK)
+         ======================================================== -->
+    <section id="slide-home" class="slide-view flex flex-col items-center justify-center w-full max-w-2xl mx-auto text-center select-none">
+      
+      <div id="home-clock-date" class="text-sm font-semibold tracking-wider text-purple-300 mb-1 uppercase">
+        Jumat, 9 Oktober 2026
+      </div>
+
+      <div id="home-clock-time" class="font-display font-extrabold text-7xl sm:text-8xl md:text-9xl text-white mb-2 tracking-tight">
+        19<span class="pulsing-colon">:</span>45<span class="text-3xl text-white/40 ml-1 font-normal">30</span>
+      </div>
+
+      <h2 id="home-greeting-text" class="text-2xl sm:text-3xl font-bold text-white mb-1">
+        Selamat Malam, Sobat Fokus ✨
+      </h2>
+
+      <p id="home-user-motto" class="text-sm text-white/60 italic max-w-md mx-auto mb-8">
+        “Ketenangan adalah kunci kejernihan pikiran”
+      </p>
+
+      <!-- Button Mulai Fokus -->
+      <button 
+        onclick="switchSlide('focus')" 
+        class="btn-primary-glow px-8 py-3 rounded-full text-sm font-bold flex items-center gap-2 shadow-xl"
+      >
+        <span>🖐️</span>
+        <span data-i18n="startFocusNow">Mulai Fokus Belajar Sekarang</span>
+      </button>
+
+    </section>
+
+  </div>
+
+  <!-- Floating shortcuts: tasks, music, and ambience -->
+  <aside class="floating-bottom-left">
+    <!-- Task list -->
+    <button 
+      onclick="toggleTaskModal()" 
+      class="bottom-left-icon-btn" 
+      title="Kelola Daftar Tugas"
+      aria-label="Kelola Daftar Tugas"
+    >
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+      </svg>
+    </button>
+
+    <!-- Spotify player -->
+    <button 
+      onclick="toggleAmbientDrawer(true, 'spotify')" 
+      class="bottom-left-icon-btn" 
+      title="Pemutar Musik Spotify Lofi"
+      aria-label="Pemutar Musik Spotify Lofi"
+    >
+      <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+        <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+      </svg>
+    </button>
+
+    <!-- Ambient sound mixer -->
+    <button 
+      onclick="toggleAmbientDrawer(true, 'ambient')" 
+      class="bottom-left-icon-btn" 
+      title="Suara Ambience / Nature Sounds"
+      aria-label="Suara Ambience / Nature Sounds"
+    >
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+      </svg>
+    </button>
+  </aside>
+
+  <!-- ========================================================
+       BOTTOM RIGHT FLOATING TOOLBAR (PERSIS GAMBAR CONTOH)
+       ======================================================== -->
+  <aside class="flocus-nav-dock fixed bottom-6 right-6 z-50">
+    <nav class="floating-pill-nav" aria-label="Bilah Navigasi">
+      
+      <!-- 1. Streak Pill: 🔥 1 -->
+      <div 
+        id="pill-streak-badge" 
+        class="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-amber-400 select-none cursor-pointer"
+        onclick="openSettingsModal('stats')"
+        title="Streak Harian Berturut-turut"
+      >
+        <span>🔥</span>
+        <span id="floating-streak-val">3</span>
+      </div>
+
+      <!-- 3. 🏠 Home Button (⌂) -->
+      <button 
+        id="nav-btn-home"
+        onclick="switchSlide('home')" 
+        class="floating-pill-btn"
+        title="Beranda & Jam Digital (🏠)"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+        </svg>
+      </button>
+
+      <!-- Focus / timer -->
+      <button 
+        id="nav-btn-focus"
+        onclick="switchSlide('focus')" 
+        class="floating-pill-btn active"
+        title="Timer Fokus"
+        aria-label="Timer Fokus"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 7v14m0-14C10.5 5.7 8.5 5 5 5v14c3.5 0 5.5.7 7 2m0-14c1.5-1.3 3.5-2 7-2v14c-3.5 0-5.5.7-7 2"/>
+        </svg>
+      </button>
+
+      <!-- 5. ⚙️ Settings Button -->
+      <button 
+        id="nav-btn-settings"
+        onclick="openSettingsModal()" 
+        class="floating-pill-btn"
+        title="Pengaturan Studio (⚙️)"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </button>
+
+      <!-- Floating timer window -->
+      <button
+        id="btn-floating-timer"
+        onclick="openFloatingTimer()"
+        class="floating-pill-btn"
+        title="Buka timer mengambang"
+        aria-label="Buka timer mengambang"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="13" rx="2"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8 21h8m-4-4v4m-5-9l3-3 2 2 3-4"/>
+        </svg>
+      </button>
+
+      <!-- Fullscreen Button -->
+      <button 
+        id="btn-fullscreen-bottom"
+        onclick="toggleFullScreen()" 
+        class="floating-pill-btn"
+        title="Layar Penuh / Fullscreen (⛶)"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+        </svg>
+      </button>
+
+    </nav>
+  </aside>
+
+  <!-- ========================================================
+       DRAWER: SPOTIFY LOFI PLAYER & AMBIENT SOUND SYNTH
+       ======================================================== -->
+  <div id="ambient-sound-drawer" class="drawer-backdrop fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end">
+    <div class="drawer-panel w-full max-w-md h-full bg-[#11141c]/95 backdrop-blur-2xl border-l border-white/15 flex flex-col justify-between p-6 shadow-2xl text-slate-100 overflow-y-auto">
+      
+      <!-- Drawer Header & Tabs -->
+      <div>
+        <div class="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl p-2 rounded-xl bg-white/10">☁</span>
+            <div>
+              <h2 data-i18n="drawerTitle" class="font-bold text-base text-white">Audio & Musik</h2>
+              <p data-i18n="drawerSubtitle" class="text-xs text-white/50">Spotify Lofi & Sintesis Suara Alam</p>
+            </div>
+          </div>
+          <button 
+            onclick="toggleAmbientDrawer(false)" 
+            class="w-8 h-8 rounded-full glass-button flex items-center justify-center text-white/60 hover:text-white"
+          >
+            ✕
+          </button>
+        </div>
+
+        <!-- 2 Tab Pemutar: [ 🎧 Spotify ] | [ 🌧️ Suara Alam ] -->
+        <div class="grid grid-cols-2 gap-2 mb-6 p-1 rounded-2xl bg-white/5 border border-white/10">
+          <button 
+            id="drawer-tab-btn-spotify" 
+            onclick="switchDrawerTab('spotify')" 
+            class="mode-tab-btn active py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+          >
+            <span data-i18n="tabSpotify">🎧 Pemutar Spotify</span>
+          </button>
+          <button 
+            id="drawer-tab-btn-ambient" 
+            onclick="switchDrawerTab('ambient')" 
+            class="mode-tab-btn py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+          >
+            <span data-i18n="tabAmbient">🌧️ Suara Alam</span>
+          </button>
+        </div>
+
+        <!-- PANEL 1: SPOTIFY PLAYER -->
+        <div id="drawer-panel-spotify" class="space-y-5">
+          <div class="rounded-2xl overflow-hidden border border-white/15 shadow-2xl bg-[#121212] relative">
+            <iframe 
+              id="spotify-embed-iframe"
+              src="https://open.spotify.com/embed/playlist/0vvXsWCC9xrXsKd4FyS8kM?utm_source=generator&theme=0" 
+              width="100%" 
+              height="152" 
+              frameBorder="0" 
+              allowfullscreen="" 
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+              loading="lazy"
+              class="w-full rounded-2xl"
+            ></iframe>
+          </div>
+
+          <div>
+            <span data-i18n="spotifyPresetsTitle" class="text-xs font-bold text-white/50 uppercase tracking-wider block mb-2.5">
+              PLAYLIST LOFI PILIHAN
+            </span>
+            <div id="spotify-presets-container" class="grid grid-cols-2 gap-2">
+              <!-- Dynamically populated in JS -->
+            </div>
+          </div>
+
+          <div class="glass-panel p-4 rounded-2xl space-y-3">
+            <span data-i18n="spotifyCustomTitle" class="text-xs font-bold text-white/80 uppercase tracking-wider block">
+              LINK PLAYLIST / LAGU SENDIRI
+            </span>
+            <div class="flex gap-2">
+              <input 
+                type="text" 
+                id="custom-spotify-input" 
+                data-i18n-ph="spotifyInputPlaceholder"
+                placeholder="Tempel URL Spotify (playlist/album/lagu)..." 
+                class="flex-1 bg-white/10 border border-white/15 rounded-xl px-3 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-purple-400"
+                onkeydown="if(event.key === 'Enter') loadSpotifyPlaylist(this.value);"
+              />
+              <button 
+                type="button" 
+                onclick="loadSpotifyPlaylist(document.getElementById('custom-spotify-input').value)" 
+                class="btn-primary-glow px-4 py-2 rounded-xl text-xs font-bold"
+                data-i18n="spotifyLoadBtn"
+              >
+                Muat
+              </button>
+            </div>
+            <p data-i18n="spotifyHint" class="text-[11px] text-white/50 leading-relaxed">
+              💡 Tips: Kamu bisa memutar musik Spotify bersamaan dengan suara hujan di tab Suara Alam!
+            </p>
+          </div>
+        </div>
+
+        <!-- PANEL 2: SUARA ALAM (AMBIENCE SYNTH) -->
+        <div id="drawer-panel-ambient" class="hidden space-y-5">
+          <div class="glass-panel p-4 rounded-2xl">
+            <div class="flex items-center justify-between mb-2">
+              <span data-i18n="masterVolumeLabel" class="text-xs font-semibold text-white/80">Master Volume</span>
+              <button 
+                id="ambient-mute-btn" 
+                onclick="audio.toggleMute()" 
+                class="glass-pill-sm px-2.5 py-1 rounded-lg text-xs font-medium text-purple-300 hover:text-white"
+              >
+                🔊 Mute All
+              </button>
+            </div>
+            <input 
+              type="range" 
+              id="ambient-master-slider" 
+              min="0" 
+              max="100" 
+              value="70" 
+              oninput="audio.setMasterVolume(this.value / 100)" 
+              class="w-full accent-purple-500"
+            />
+          </div>
+
+          <div>
+            <span data-i18n="soundPresetsTitle" class="text-xs font-semibold text-white/50 uppercase tracking-wider block mb-2">
+              PRESET SUARA CEPAT
+            </span>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="setAmbientPreset('rainy')" class="glass-pill-sm p-2 rounded-xl text-xs font-medium flex items-center gap-2">
+                <span>🌧️</span> Hujan Deras
+              </button>
+              <button onclick="setAmbientPreset('forest')" class="glass-pill-sm p-2 rounded-xl text-xs font-medium flex items-center gap-2">
+                <span>🌲</span> Hutan & Burung
+              </button>
+              <button onclick="setAmbientPreset('ocean')" class="glass-pill-sm p-2 rounded-xl text-xs font-medium flex items-center gap-2">
+                <span>🌊</span> Ombak Pantai
+              </button>
+              <button onclick="setAmbientPreset('cozy_cafe')" class="glass-pill-sm p-2 rounded-xl text-xs font-medium flex items-center gap-2">
+                <span>☕</span> Kafe & Lilin
+              </button>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <span data-i18n="individualMixerTitle" class="text-xs font-semibold text-white/50 uppercase tracking-wider block">
+              MIXER SUARA INDIVIDUAL
+            </span>
+
+            <div class="glass-panel p-3 rounded-2xl flex flex-col gap-1.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-medium flex items-center gap-2 text-white/90">
+                  <span>🌧️</span> Suara Hujan (Rain)
+                </span>
+                <span id="ambient-badge-rain" class="font-mono text-[11px] text-white/40">0%</span>
+              </div>
+              <input type="range" id="ambient-slider-rain" min="0" max="100" value="0" oninput="audio.setTrackVolume('rain', this.value / 100)" class="w-full" />
+            </div>
+
+            <div class="glass-panel p-3 rounded-2xl flex flex-col gap-1.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-medium flex items-center gap-2 text-white/90">
+                  <span>🌲</span> Hutan & Angin (Forest)
+                </span>
+                <span id="ambient-badge-forest" class="font-mono text-[11px] text-white/40">0%</span>
+              </div>
+              <input type="range" id="ambient-slider-forest" min="0" max="100" value="0" oninput="audio.setTrackVolume('forest', this.value / 100)" class="w-full" />
+            </div>
+
+            <div class="glass-panel p-3 rounded-2xl flex flex-col gap-1.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-medium flex items-center gap-2 text-white/90">
+                  <span>🌊</span> Ombak Laut (Ocean)
+                </span>
+                <span id="ambient-badge-ocean" class="font-mono text-[11px] text-white/40">0%</span>
+              </div>
+              <input type="range" id="ambient-slider-ocean" min="0" max="100" value="0" oninput="audio.setTrackVolume('ocean', this.value / 100)" class="w-full" />
+            </div>
+
+            <div class="glass-panel p-3 rounded-2xl flex flex-col gap-1.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-medium flex items-center gap-2 text-white/90">
+                  <span>🔥</span> Api Unggun (Fireplace)
+                </span>
+                <span id="ambient-badge-fire" class="font-mono text-[11px] text-white/40">0%</span>
+              </div>
+              <input type="range" id="ambient-slider-fire" min="0" max="100" value="0" oninput="audio.setTrackVolume('fire', this.value / 100)" class="w-full" />
+            </div>
+
+            <div class="glass-panel p-3 rounded-2xl flex flex-col gap-1.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-medium flex items-center gap-2 text-white/90">
+                  <span>☕</span> Gemuruh Kafe (Cafe)
+                </span>
+                <span id="ambient-badge-cafe" class="font-mono text-[11px] text-white/40">0%</span>
+              </div>
+              <input type="range" id="ambient-slider-cafe" min="0" max="100" value="0" oninput="audio.setTrackVolume('cafe', this.value / 100)" class="w-full" />
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="pt-4 border-t border-white/10 mt-4 flex items-center justify-between">
+        <button 
+          onclick="setAmbientPreset('stop')" 
+          class="text-xs text-red-400 hover:text-red-300 font-medium py-1 px-2.5 rounded-lg hover:bg-red-500/10 transition-colors"
+          data-i18n="stopAllSounds"
+        >
+          Hentikan Semua Suara
+        </button>
+        <span class="text-[11px] text-white/40">Web Audio Synth</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MODAL: TASK MANAGER / CHECKLIST
+       ======================================================== -->
+  <div id="task-manager-modal" class="modal-overlay fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="modal-content glass-panel w-full max-w-md rounded-3xl p-6 shadow-2xl border border-white/15">
+      
+      <div class="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">📋</span>
+          <div>
+            <h3 data-i18n="tasksTitle" class="font-bold text-base text-white">Target & Daftar Tugas</h3>
+            <span id="task-count-badge" class="text-xs text-white/50">2 tugas tersisa</span>
+          </div>
+        </div>
+        <button onclick="toggleTaskModal(false)" class="w-8 h-8 rounded-full glass-button flex items-center justify-center text-white/60 hover:text-white">
+          ✕
+        </button>
+      </div>
+
+      <!-- Input Tambah Tugas Baru -->
+      <form onsubmit="event.preventDefault(); const inp = document.getElementById('new-task-input'); addNewTask(inp.value); inp.value = '';" class="flex gap-2 mb-4">
+        <input 
+          type="text" 
+          id="new-task-input" 
+          data-i18n-ph="newTaskPlaceholder"
+          placeholder="Tulis tugas fokus baru..." 
+          class="flex-1 bg-white/5 border border-white/15 rounded-xl px-4 py-2 text-sm text-white placeholder-white/40 focus:outline-none focus:border-purple-400 transition-colors"
+        />
+        <button type="submit" class="btn-primary-glow px-4 py-2 rounded-xl text-sm font-semibold" data-i18n="addTaskBtn">
+          Tambah
+        </button>
+      </form>
+
+      <!-- Task Items List -->
+      <div id="task-list-items" class="space-y-1 max-h-60 overflow-y-auto pr-1">
+        <!-- Dynamically rendered via JS -->
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs text-white/40">
+        <span>Klik 📌 untuk fokus utama</span>
+        <button onclick="toggleTaskModal(false)" class="text-purple-300 font-semibold hover:underline">Tutup</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MODAL PENGATURAN SERBAGUNA (4 TABS)
+       ======================================================== -->
+  <div id="settings-modal" class="modal-overlay fixed inset-0 z-50 bg-black/65 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="modal-content glass-panel w-full max-w-2xl max-h-[90vh] rounded-3xl shadow-2xl border border-white/15 flex flex-col overflow-hidden">
+      
+      <div class="p-6 pb-0 border-b border-white/10 bg-white/[0.02]">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl p-2 rounded-2xl bg-white/10">⚙️</span>
+            <div>
+              <h2 data-i18n="settingsTitle" class="font-bold text-lg text-white">Pengaturan Studio</h2>
+              <p data-i18n="settingsSubtitle" class="text-xs text-white/50">Sesuaikan bahasa, tema visual, pewaktu, dan profil</p>
+            </div>
+          </div>
+          <button onclick="closeSettingsModal()" class="w-8 h-8 rounded-full glass-button flex items-center justify-center text-white/60 hover:text-white">
+            ✕
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2 overflow-x-auto pb-3 text-xs sm:text-sm font-semibold scrollbar-none">
+          <button id="settings-tab-btn-themes" onclick="switchSettingsTab('themes')" class="mode-tab-btn active px-4 py-2 rounded-xl flex items-center gap-2 whitespace-nowrap">
+            <span>🎨</span> <span data-i18n="tabThemes">Tampilan & Tema</span>
+          </button>
+          <button id="settings-tab-btn-timer" onclick="switchSettingsTab('timer')" class="mode-tab-btn px-4 py-2 rounded-xl flex items-center gap-2 whitespace-nowrap">
+            <span>⏱️</span> <span data-i18n="tabTimer">Jadwal & Waktu</span>
+          </button>
+          <button id="settings-tab-btn-stats" onclick="switchSettingsTab('stats')" class="mode-tab-btn px-4 py-2 rounded-xl flex items-center gap-2 whitespace-nowrap">
+            <span>🔥</span> <span data-i18n="tabStats">Statistik & Streak</span>
+          </button>
+          <button id="settings-tab-btn-account" onclick="switchSettingsTab('account')" class="mode-tab-btn px-4 py-2 rounded-xl flex items-center gap-2 whitespace-nowrap">
+            <span>👤</span> <span data-i18n="tabAccount">Akun & Bahasa</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-6 space-y-6">
+
+        <!-- TAB 1: TAMPILAN (THEMES) -->
+        <div id="settings-tab-content-themes" class="space-y-6">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h4 data-i18n="themeCollectionTitle" class="text-sm font-bold text-white uppercase tracking-wider">Koleksi Tema Visual & Wallpaper</h4>
+              <span data-i18n="themeLivePreview" class="text-xs text-purple-400">Pratinjau Langsung</span>
+            </div>
+            <p data-i18n="themeDescription" class="text-xs text-white/60 mb-4">
+              Pilih dari 5 wallpaper asli (Fuji, Lofi Room, Balcony, Forest, Autumn) atau gradien estetik murni.
+            </p>
+            <div id="theme-swatches-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <!-- Dynamically populated in JS -->
+            </div>
+          </div>
+
+          <div class="glass-panel p-4 rounded-2xl space-y-4">
+            <h5 data-i18n="glassSettingsTitle" class="text-xs font-bold text-white/80 uppercase tracking-wider">Kustomisasi Kejernihan Glassmorphism</h5>
+            
+            <div>
+              <div class="flex justify-between text-xs text-white/70 mb-1.5">
+                <span data-i18n="bgBlurLabel">Efek Blur Latar Belakang</span>
+                <span id="val-bg-blur" class="font-mono text-purple-300">0px</span>
+              </div>
+              <input type="range" id="setting-bg-blur" min="0" max="20" value="0" oninput="state.settings.bgBlur = parseInt(this.value); document.getElementById('val-bg-blur').textContent = this.value + 'px'; applyBackgroundFilters(); saveState();" class="w-full" />
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs text-white/70 mb-1.5">
+                <span data-i18n="bgDimLabel">Kegelapan Overlay (Kontras Teks)</span>
+                <span id="val-bg-dim" class="font-mono text-purple-300">35%</span>
+              </div>
+              <input type="range" id="setting-bg-dim" min="10" max="80" value="35" oninput="state.settings.bgDim = this.value / 100; document.getElementById('val-bg-dim').textContent = this.value + '%'; applyBackgroundFilters(); saveState();" class="w-full" />
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: JADWAL (TIMER CUSTOMIZATION) -->
+        <div id="settings-tab-content-timer" class="hidden space-y-6">
+          <form onsubmit="event.preventDefault(); saveTimerSettings();" class="space-y-6">
+            <div>
+              <h4 data-i18n="timerDurationTitle" class="text-sm font-bold text-white uppercase tracking-wider mb-3">Durasi Waktu (Menit)</h4>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="glass-panel p-3.5 rounded-2xl">
+                  <label data-i18n="focusDurationLabel" class="block text-xs text-white/60 mb-1">Durasi Fokus</label>
+                  <input type="number" id="setting-focus-time" min="1" max="180" value="25" class="w-full bg-white/10 rounded-xl px-3 py-2 text-white font-mono font-bold text-lg focus:outline-none focus:ring-1 focus:ring-purple-400" />
+                </div>
+                <div class="glass-panel p-3.5 rounded-2xl">
+                  <label data-i18n="shortBreakLabel" class="block text-xs text-white/60 mb-1">Istirahat Singkat</label>
+                  <input type="number" id="setting-short-break" min="1" max="60" value="5" class="w-full bg-white/10 rounded-xl px-3 py-2 text-white font-mono font-bold text-lg focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                </div>
+                <div class="glass-panel p-3.5 rounded-2xl">
+                  <label data-i18n="longBreakLabel" class="block text-xs text-white/60 mb-1">Istirahat Panjang</label>
+                  <input type="number" id="setting-long-break" min="1" max="90" value="15" class="w-full bg-white/10 rounded-xl px-3 py-2 text-white font-mono font-bold text-lg focus:outline-none focus:ring-1 focus:ring-sky-400" />
+                </div>
+              </div>
+            </div>
+
+            <div class="glass-panel p-4 rounded-2xl space-y-3">
+              <h5 data-i18n="intervalTitle" class="text-xs font-bold text-white/80 uppercase tracking-wider">Interval & Otomatisasi Siklus</h5>
+              <div class="flex items-center justify-between py-1">
+                <div>
+                  <div data-i18n="longBreakIntervalLabel" class="text-xs font-semibold text-white">Interval Istirahat Panjang</div>
+                  <div data-i18n="longBreakIntervalDesc" class="text-[11px] text-white/50">Berapa sesi fokus sebelum jeda panjang</div>
+                </div>
+                <input type="number" id="setting-long-interval" min="2" max="12" value="4" class="w-16 bg-white/10 rounded-lg px-2 py-1 text-center font-mono text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-400" />
+              </div>
+
+              <div class="flex items-center justify-between py-1 border-t border-white/5">
+                <div>
+                  <div data-i18n="autoStartBreakLabel" class="text-xs font-semibold text-white">Mulai Istirahat Otomatis</div>
+                  <div data-i18n="autoStartBreakDesc" class="text-[11px] text-white/50">Langsung mulai hitungan mundur istirahat</div>
+                </div>
+                <input type="checkbox" id="setting-auto-break" class="w-5 h-5 rounded cursor-pointer accent-purple-500" />
+              </div>
+
+              <div class="flex items-center justify-between py-1 border-t border-white/5">
+                <div>
+                  <div data-i18n="autoStartFocusLabel" class="text-xs font-semibold text-white">Mulai Fokus Otomatis</div>
+                  <div data-i18n="autoStartFocusDesc" class="text-[11px] text-white/50">Mulai sesi fokus baru saat jeda selesai</div>
+                </div>
+                <input type="checkbox" id="setting-auto-focus" class="w-5 h-5 rounded cursor-pointer accent-purple-500" />
+              </div>
+            </div>
+
+            <div class="glass-panel p-4 rounded-2xl">
+              <h5 data-i18n="alarmSoundTitle" class="text-xs font-bold text-white/80 uppercase tracking-wider mb-2">Suara Bel Alarm (Web Audio Synth)</h5>
+              <div class="flex gap-2">
+                <select id="setting-alarm-sound" class="flex-1 bg-white/10 border border-white/15 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-400">
+                  <option value="soft_chime" class="bg-slate-900 text-white">✨ Soft Focus Chime</option>
+                  <option value="alarm_bell" class="bg-slate-900 text-white">🔔 Classic Double Bell</option>
+                  <option value="zen_bell" class="bg-slate-900 text-white">✨ Zen Bell</option>
+                  <option value="tibetan_bowl" class="bg-slate-900 text-white">🥣 Tibetan Singing Bowl</option>
+                  <option value="piano_chord" class="bg-slate-900 text-white">🎹 Soft Piano Chord</option>
+                  <option value="marimba" class="bg-slate-900 text-white">🎶 Marimba Wooden Melody</option>
+                  <option value="digital_beep" class="bg-slate-900 text-white">⚡ Modern Digital Beep</option>
+                </select>
+                <button type="button" onclick="previewAlarmSound()" class="glass-button px-4 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 text-purple-300">
+                  <span>🔊</span> <span data-i18n="testSoundBtn">Test Suara</span>
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" class="w-full btn-primary-glow py-3 rounded-2xl font-bold text-sm tracking-wide shadow-lg" data-i18n="saveTimerBtn">
+              Simpan Pengaturan Jadwal
+            </button>
+          </form>
+        </div>
+
+        <!-- TAB 3: STATS (STATISTIK & STREAK) -->
+        <div id="settings-tab-content-stats" class="hidden space-y-6">
+          <div class="grid grid-cols-3 gap-3">
+            <div class="glass-panel p-4 rounded-2xl text-center">
+              <span class="text-xl">🔥</span>
+              <div data-i18n="statsStreakToday" class="text-[10px] uppercase font-bold text-white/50 tracking-wider mt-1">Streak Hari Ini</div>
+              <div id="stats-streak-val" class="text-xl font-bold text-amber-400 font-mono mt-0.5">3 Hari</div>
+            </div>
+            <div class="glass-panel p-4 rounded-2xl text-center">
+              <span class="text-xl">⏱️</span>
+              <div data-i18n="statsTotalMinutes" class="text-[10px] uppercase font-bold text-white/50 tracking-wider mt-1">Total Fokus Hari Ini</div>
+              <div id="stats-minutes-val" class="text-xl font-bold text-emerald-400 font-mono mt-0.5">50 Menit</div>
+            </div>
+            <div class="glass-panel p-4 rounded-2xl text-center">
+              <span class="text-xl">🎯</span>
+              <div data-i18n="statsTotalSessions" class="text-[10px] uppercase font-bold text-white/50 tracking-wider mt-1">Sesi Pomodoro</div>
+              <div id="stats-sessions-val" class="text-xl font-bold text-purple-300 font-mono mt-0.5">2 Sesi</div>
+            </div>
+          </div>
+
+          <div class="glass-panel p-4 rounded-2xl">
+            <div class="flex items-center justify-between mb-4">
+              <h4 data-i18n="stats7DaysTitle" class="text-xs font-bold text-white uppercase tracking-wider">Aktivitas Fokus 7 Hari Terakhir</h4>
+              <span data-i18n="stats7DaysSubtitle" class="text-[10px] text-white/50">Menit per hari</span>
+            </div>
+            <div id="stats-week-chart" class="flex items-end justify-between gap-2 h-36 pt-4">
+              <!-- Dynamically populated in JS -->
+            </div>
+          </div>
+
+          <div class="glass-panel p-4 rounded-2xl">
+            <div class="flex items-center justify-between mb-3">
+              <h4 data-i18n="statsRecentLogs" class="text-xs font-bold text-white uppercase tracking-wider">Riwayat Sesi Terakhir</h4>
+              <span class="text-[10px] text-white/40">Log</span>
+            </div>
+            <div id="stats-logs-list" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+              <!-- Dynamically populated in JS -->
+            </div>
+          </div>
+
+          <div class="flex justify-end pt-2">
+            <button type="button" onclick="resetStatsData()" class="text-xs text-red-400 hover:text-red-300 py-1.5 px-3 rounded-lg hover:bg-red-500/10 transition-colors" data-i18n="resetStatsBtn">
+              Reset Data Statistik
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 4: AKUN & BAHASA -->
+        <div id="settings-tab-content-account" class="hidden space-y-6">
+          <form onsubmit="event.preventDefault(); saveProfileSettings();" class="space-y-6">
+            <div class="glass-panel p-4 rounded-2xl space-y-2">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h4 data-i18n="languageSectionTitle" class="text-xs font-bold text-white uppercase tracking-wider">Pilihan Bahasa (Language)</h4>
+                  <p data-i18n="selectLanguageLabel" class="text-[11px] text-white/50">Bahasa Tampilan Aplikasi</p>
+                </div>
+                <div class="flex items-center gap-1.5 p-1 rounded-xl bg-white/10 border border-white/10">
+                  <button type="button" onclick="setLanguage('id')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all" id="btn-lang-id">
+                    🇮🇩 Indonesia
+                  </button>
+                  <button type="button" onclick="setLanguage('en')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all" id="btn-lang-en">
+                    🇬🇧 English
+                  </button>
+                </div>
+              </div>
+              <input type="hidden" id="setting-profile-lang" value="id">
+            </div>
+
+            <div>
+              <label data-i18n="selectAvatarLabel" class="block text-xs font-bold text-white/70 uppercase tracking-wider mb-2">Pilih Avatar Profil</label>
+              <div id="avatar-options-container" class="grid grid-cols-6 gap-2">
+                <!-- Dynamically populated in JS -->
+              </div>
+            </div>
+
+            <div>
+              <label data-i18n="usernameLabel" class="block text-xs font-bold text-white/70 uppercase tracking-wider mb-1">Nama Pengguna</label>
+              <input type="text" id="setting-profile-name" placeholder="Masukkan namamu..." class="w-full bg-white/10 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-purple-400" />
+            </div>
+
+            <div>
+              <label data-i18n="dailyGoalLabel" class="block text-xs font-bold text-white/70 uppercase tracking-wider mb-1">Target Fokus Harian (Menit)</label>
+              <input type="number" id="setting-profile-goal" min="10" max="720" value="120" class="w-full bg-white/10 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-400" />
+            </div>
+
+            <div>
+              <label data-i18n="mottoLabel" class="block text-xs font-bold text-white/70 uppercase tracking-wider mb-1">Motto / Afirmasi Belajar</label>
+              <textarea id="setting-profile-motto" rows="2" placeholder="Tuliskan kata motivasi favoritmu..." class="w-full bg-white/10 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-purple-400 resize-none"></textarea>
+            </div>
+
+            <button type="submit" class="w-full btn-primary-glow py-3 rounded-2xl font-bold text-sm tracking-wide shadow-lg" data-i18n="saveProfileBtn">
+              Simpan Pengaturan Profil & Bahasa
+            </button>
+          </form>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TIMER RESET CONFIRMATION -->
+  <div id="timer-reset-confirm" class="modal-overlay fixed inset-0 z-[60] bg-black/65 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="timer-reset-confirm-title" aria-describedby="timer-reset-confirm-message">
+    <div class="modal-content glass-panel w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-white/15 text-center">
+      <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-400/15 text-amber-300" aria-hidden="true">
+        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.86 1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.7 3.86a2 2 0 00-3.4 0z"/>
+        </svg>
+      </div>
+      <h2 id="timer-reset-confirm-title" data-i18n="resetConfirmTitle" class="text-lg font-bold text-white">Reset timer?</h2>
+      <p id="timer-reset-confirm-message" data-i18n="resetConfirmMessage" class="mt-2 text-sm leading-relaxed text-white/65">Waktu sesi saat ini akan dikembalikan ke durasi awal. Kamu yakin ingin melanjutkan?</p>
+      <div class="mt-6 flex justify-center gap-3">
+        <button id="btn-cancel-timer-reset" type="button" onclick="cancelTimerResetConfirmation()" data-i18n="resetConfirmCancel" class="glass-button rounded-xl px-5 py-2.5 text-sm font-semibold text-white/80 hover:text-white">Tidak</button>
+        <button type="button" onclick="confirmTimerReset()" data-i18n="resetConfirmAccept" class="btn-primary-glow rounded-xl px-5 py-2.5 text-sm font-semibold">Ya, reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFIKASI -->
+  <div id="toast-notification" class="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 glass-pill-sm px-5 py-2.5 rounded-full flex items-center gap-2 shadow-2xl border border-white/20 pointer-events-none">
+    <span class="text-purple-300 text-sm">✨</span>
+    <span id="toast-message" class="text-xs sm:text-sm font-medium text-white/95">Pemberitahuan</span>
+  </div>
+
+  <!-- App Script -->
+  <script src="app.js"></script>
+</body>
+</html>
